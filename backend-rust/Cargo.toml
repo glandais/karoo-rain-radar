@@ -24,7 +24,7 @@ contour = "0.1"
 geojson = "0.13"
 
 # Geometry and projections
-geo = "0.29"
+geo = "0.32"
 proj = "0.28"
 
 # Polyline encoding

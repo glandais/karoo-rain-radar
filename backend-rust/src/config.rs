@@ -1,5 +1,4 @@
 use std::env;
-use std::collections::HashMap;
 
 /// Meteo-France API configuration
 pub const METEO_API_BASE: &str = "https://public-api.meteofrance.fr/public/DPRadar/v1";
@@ -7,22 +6,15 @@ pub const ZONE: &str = "METROPOLE";
 pub const OBSERVATION: &str = "LAME_D_EAU";
 pub const MAILLE: u32 = 500;
 
-/// Rain intensity thresholds (ACRR in 0.01 mm units)
-pub fn thresholds() -> Vec<(&'static str, f64)> {
-    vec![
-        ("light", 10.0),      // 0.1 mm - light rain
-        ("moderate", 50.0),   // 0.5 mm - moderate rain
-        ("heavy", 100.0),     // 1.0 mm - heavy rain
-    ]
-}
+const MIN: f64 = 0.1;
+const MAX: f64 = 2.0;
+const STEPS: u32 = 5;
+const MUL: f64 = (MAX - MIN) / ((STEPS - 1) as f64);
 
-/// Colors for each rain level (ARGB format for Karoo)
-pub fn colors() -> HashMap<&'static str, &'static str> {
-    let mut m = HashMap::new();
-    m.insert("light", "#00FF00");      // Green
-    m.insert("moderate", "#FFFF00");   // Yellow
-    m.insert("heavy", "#FF0000");      // Red
-    m
+/// Rain intensity thresholds (ACRR in 0.01 mm units)
+/// Returns (level_name, threshold_value) pairs for r1 through r50
+pub fn thresholds() -> Vec<f64> {
+    (0..=STEPS).map(|i| 100.0 * (MIN + i as f64 * MUL)).collect()
 }
 
 /// Download polling interval in seconds

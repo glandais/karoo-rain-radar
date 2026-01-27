@@ -5,10 +5,27 @@ use std::io::Write;
 use tempfile::NamedTempFile;
 
 use crate::error::AppError;
-use crate::models::RadarCache;
+
+/// Intermediate parsed radar data before contour computation
+pub struct ParsedRadarData {
+    /// Radar data array (rain intensity in 0.01 mm units)
+    pub data: Array2<f64>,
+    /// Projection definition string (PROJ format)
+    pub projdef: String,
+    /// X origin in projection coordinates
+    pub x_origin: f64,
+    /// Y origin in projection coordinates
+    pub y_origin: f64,
+    /// X scale (meters per pixel)
+    pub x_scale: f64,
+    /// Y scale (meters per pixel)
+    pub y_scale: f64,
+    /// Radar data timestamp string (e.g., "20260127T143500Z")
+    pub date_str: String,
+}
 
 /// Parse HDF5 radar data and extract projection info
-pub fn parse_hdf5(data: &[u8]) -> Result<RadarCache, AppError> {
+pub fn parse_hdf5(data: &[u8]) -> Result<ParsedRadarData, AppError> {
     // Write data to a temporary file (hdf5 crate requires a file path)
     let mut tmp_file = NamedTempFile::new()
         .map_err(|e| AppError::Hdf5(format!("Failed to create temp file: {}", e)))?;
@@ -77,7 +94,7 @@ pub fn parse_hdf5(data: &[u8]) -> Result<RadarCache, AppError> {
     let date_str = read_string_attr(&what_root, "date")?;
     let time_str = read_string_attr(&what_root, "time")?;
 
-    Ok(RadarCache {
+    Ok(ParsedRadarData {
         data: data_array,
         projdef,
         x_origin,

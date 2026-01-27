@@ -21,8 +21,7 @@ pub struct LatLng {
 /// Single contour with encoded polyline
 #[derive(Debug, Serialize)]
 pub struct ContourData {
-    pub level: String,
-    pub color: String,
+    pub rain_rate: f64,
     pub polyline: String,
     pub points: usize,
 }

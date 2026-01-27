@@ -22,7 +22,8 @@ use tracing::{info, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use crate::config::POLLING_INTERVAL_SECONDS;
-use crate::services::{fetch_latest_timestamp, fetch_radar_data, parse_hdf5};
+use crate::models::RadarCache;
+use crate::services::{compute_all_contours, fetch_latest_timestamp, fetch_radar_data, parse_hdf5};
 use crate::state::AppState;
 
 /// Parse radar timestamp from format 'YYYYMMDDTHHMMSSZ' to DateTime
@@ -78,17 +79,31 @@ async fn check_and_download(state: &AppState, client: &Client) {
                 match fetch_radar_data(client).await {
                     Ok(data) => {
                         match parse_hdf5(&data) {
-                            Ok(radar_cache) => {
-                                let date_str = radar_cache.date_str.clone();
-                                {
-                                    let mut cache = state.radar_cache.write().await;
-                                    *cache = Some(radar_cache);
-                                }
-                                info!("[{}] Radar data downloaded: {}", log_time, date_str);
+                            Ok(parsed) => {
+                                let date_str = parsed.date_str.clone();
 
-                                let next_poll = calculate_next_poll_time(&date_str);
-                                let wait_seconds = next_poll - now;
-                                info!("[{}] Next poll in {:.0} seconds", log_time, wait_seconds);
+                                // Compute contours from parsed data
+                                match compute_all_contours(&parsed) {
+                                    Ok(contours) => {
+                                        let radar_cache = RadarCache {
+                                            date_str: date_str.clone(),
+                                            contours,
+                                        };
+
+                                        {
+                                            let mut cache = state.radar_cache.write().await;
+                                            *cache = Some(radar_cache);
+                                        }
+                                        info!("[{}] Radar data downloaded and contours computed: {}", log_time, date_str);
+
+                                        let next_poll = calculate_next_poll_time(&date_str);
+                                        let wait_seconds = next_poll - now;
+                                        info!("[{}] Next poll in {:.0} seconds", log_time, wait_seconds);
+                                    }
+                                    Err(e) => {
+                                        error!("[{}] Contour computation error: {}", log_time, e);
+                                    }
+                                }
                             }
                             Err(e) => {
                                 error!("[{}] HDF5 parse error: {}", log_time, e);
@@ -154,6 +169,7 @@ async fn main() {
     // Build router
     let app = Router::new()
         .route("/api/radar", get(routes::get_radar))
+        .route("/api/radar/all", get(routes::get_radar_all))
         .route("/api/health", get(routes::health))
         .nest_service("/static", ServeDir::new(&static_dir))
         .fallback_service(ServeDir::new(&static_dir).append_index_html_on_directories(true))

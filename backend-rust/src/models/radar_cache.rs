@@ -1,26 +1,21 @@
-use ndarray::Array2;
+use geo::MultiPolygon;
 
-/// Cached radar data with projection info
+/// Pre-computed contour at a specific rain threshold
+pub struct PrecomputedContour {
+    /// Rain rate
+    pub rain_rate: f64,
+    /// Pre-computed polygons in lat/lng coordinates, already simplified
+    pub polygons: MultiPolygon<f64>,
+}
+
+/// Cached radar data with pre-computed contours
 pub struct RadarCache {
-    /// Radar data array (rain intensity in 0.01 mm units)
-    pub data: Array2<f64>,
-    /// Projection definition string (PROJ format)
-    pub projdef: String,
-    /// X origin in projection coordinates
-    pub x_origin: f64,
-    /// Y origin in projection coordinates
-    pub y_origin: f64,
-    /// X scale (meters per pixel)
-    pub x_scale: f64,
-    /// Y scale (meters per pixel)
-    pub y_scale: f64,
     /// Radar data timestamp string (e.g., "20260127T143500Z")
     pub date_str: String,
+    /// Pre-computed contours for each rain threshold
+    pub contours: Vec<PrecomputedContour>,
 }
 
-impl RadarCache {
-}
-
-// Implement Send and Sync manually since we no longer store Proj
+// Implement Send and Sync since MultiPolygon is Send+Sync
 unsafe impl Send for RadarCache {}
 unsafe impl Sync for RadarCache {}

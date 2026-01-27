@@ -140,6 +140,7 @@
             <input type="number" id="radius" value="50" min="5" max="100">
         </div>
         <button id="fetchBtn" onclick="fetchRadar()">Fetch Radar Data</button>
+        <button id="fetchAllBtn" onclick="fetchRadarAll()">Load All Contours</button>
         <button onclick="useMapCenter()">Use Map Center</button>
         <div id="status" class="status" style="display: none;"></div>
         <div id="stats" class="stats">
@@ -179,25 +180,6 @@
         let radarLayer = L.featureGroup().addTo(map);
         let centerMarker = null;
         let radiusCircle = null;
-
-        // Color mapping (convert ARGB to RGB for Leaflet)
-        const colors = {
-            'light': '#00FF00',
-            'moderate': '#FFFF00',
-            'heavy': '#FF0000'
-        };
-
-        const opacity = {
-            'light': 0.4,
-            'moderate': 0.6,
-            'heavy': 0.8
-        };
-
-        const weights = {
-            'light': 3,
-            'moderate': 4,
-            'heavy': 5
-        };
 
         function showStatus(message, type) {
             const status = document.getElementById('status');
@@ -283,9 +265,9 @@
 
                     // Create Leaflet polyline
                     const line = L.polyline(decoded, {
-                        color: colors[contour.level] || '#0000FF',
-                        weight: weights[contour.level] || 3,
-                        opacity: opacity[contour.level] || 0.5
+                        color: '#0000FF',
+                        weight: 3,
+                        opacity: 0.5
                     });
 
                     radarLayer.addLayer(line);
@@ -310,6 +292,74 @@
 
             } catch (error) {
                 console.error('Error fetching radar:', error);
+                showStatus('Error: ' + error.message, 'error');
+                updateStats(null);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchRadarAll() {
+            const btn = document.getElementById('fetchAllBtn');
+            btn.disabled = true;
+            showStatus('Fetching all radar contours...', 'loading');
+
+            try {
+                const response = await fetch('/api/radar/all');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Clear previous data
+                radarLayer.clearLayers();
+                if (centerMarker) {
+                    map.removeLayer(centerMarker);
+                    centerMarker = null;
+                }
+                if (radiusCircle) {
+                    map.removeLayer(radiusCircle);
+                    radiusCircle = null;
+                }
+
+                // Draw contours
+                let contoursByLevel = { light: 0, moderate: 0, heavy: 0 };
+
+                for (const contour of data.contours) {
+                    // Decode Google polyline
+                    const decoded = polyline.decode(contour.polyline);
+
+                    // Create Leaflet polyline
+                    const line = L.polyline(decoded, {
+                        color: '#0000FF',
+                        weight: 3,
+                        opacity: 0.5
+                    });
+
+                    radarLayer.addLayer(line);
+                    contoursByLevel[contour.level]++;
+                }
+
+                // Update UI
+                showStatus('Loaded ' + data.contour_count + ' contours (full coverage)', 'success');
+                document.getElementById('stat-timestamp').textContent = data.timestamp;
+                document.getElementById('stat-contours').textContent = data.contour_count;
+                document.getElementById('stat-points').textContent = data.total_points;
+
+                // Fit map to all data
+                if (data.contour_count > 0) {
+                    const bounds = radarLayer.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds.pad(0.05));
+                    }
+                }
+
+                console.log('Contours by level:', contoursByLevel);
+
+            } catch (error) {
+                console.error('Error fetching all radar:', error);
                 showStatus('Error: ' + error.message, 'error');
                 updateStats(null);
             } finally {
