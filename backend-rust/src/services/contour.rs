@@ -3,26 +3,28 @@ use geo::{Coord, LineString, MultiPolygon, Polygon, Simplify};
 use ndarray::Array2;
 use proj::Proj;
 
-use crate::config::{thresholds};
-use crate::error::AppError;
-use crate::models::PrecomputedContour;
-use crate::services::ParsedRadarData;
-
 /// Line simplification tolerance in degrees
 const SIMPLIFY_TOLERANCE: f64 = 0.0005;
 
-/// Compute all contours from parsed radar data
-/// Returns pre-computed contours at all threshold levels, transformed to lat/lng and simplified
-pub fn compute_all_contours(parsed: &ParsedRadarData) -> Result<Vec<PrecomputedContour>, AppError> {
-    // Create projection from radar coordinates to WGS84
-    let proj = Proj::new_known_crs(&parsed.projdef, "EPSG:4326", None)
-        .map_err(|e| AppError::Projection(format!("Failed to create projection: {}", e)))?;
-
-    thresholds()
-        .into_iter()
-        .map(|threshold| {
+/// Compute contours from a data subset at given thresholds
+/// Returns contours as MultiPolygons in lat/lng coordinates, already simplified
+/// row_offset and col_offset are used to adjust pixel positions to the full array
+pub fn compute_subset_contours(
+    subset: &Array2<f64>,
+    thresholds: &[f64],
+    proj: &Proj,
+    row_offset: usize,
+    col_offset: usize,
+    x_origin: f64,
+    y_origin: f64,
+    x_scale: f64,
+    y_scale: f64,
+) -> Vec<(f64, MultiPolygon<f64>)> {
+    thresholds
+        .iter()
+        .filter_map(|&threshold| {
             // Find raw contours at this threshold
-            let raw_contours = find_contours(&parsed.data, threshold);
+            let raw_contours = find_contours(subset, threshold);
 
             // Convert each contour ring to a polygon in lat/lng coordinates
             let polygons: Vec<Polygon<f64>> = raw_contours
@@ -30,14 +32,20 @@ pub fn compute_all_contours(parsed: &ParsedRadarData) -> Result<Vec<PrecomputedC
                 .filter_map(|ring| {
                     pixel_ring_to_polygon(
                         &ring,
-                        &proj,
-                        parsed.x_origin,
-                        parsed.y_origin,
-                        parsed.x_scale,
-                        parsed.y_scale,
+                        proj,
+                        row_offset,
+                        col_offset,
+                        x_origin,
+                        y_origin,
+                        x_scale,
+                        y_scale,
                     )
                 })
                 .collect();
+
+            if polygons.is_empty() {
+                return None;
+            }
 
             // Create MultiPolygon and simplify
             let multi = MultiPolygon::new(polygons);
@@ -45,18 +53,18 @@ pub fn compute_all_contours(parsed: &ParsedRadarData) -> Result<Vec<PrecomputedC
 
             let rain_rate = threshold / 100.0;
 
-            Ok(PrecomputedContour {
-                rain_rate,
-                polygons: simplified,
-            })
+            Some((rain_rate, simplified))
         })
         .collect()
 }
 
 /// Convert a pixel-coordinate ring to a lat/lng polygon
+/// row_offset and col_offset adjust for subset positioning
 fn pixel_ring_to_polygon(
     ring: &[(f64, f64)],
     proj: &Proj,
+    row_offset: usize,
+    col_offset: usize,
     x_origin: f64,
     y_origin: f64,
     x_scale: f64,
@@ -65,9 +73,13 @@ fn pixel_ring_to_polygon(
     let coords: Vec<Coord<f64>> = ring
         .iter()
         .filter_map(|(row, col)| {
+            // Adjust pixel coordinates by offset (subset position in full array)
+            let full_row = row + row_offset as f64;
+            let full_col = col + col_offset as f64;
+
             // Convert pixel (row, col) to projection coordinates
-            let x = x_origin + col * x_scale;
-            let y = y_origin - row * y_scale;
+            let x = x_origin + full_col * x_scale;
+            let y = y_origin - full_row * y_scale;
 
             // Convert to lat/lng
             proj.convert((x, y))

@@ -27,27 +27,11 @@
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            max-width: 300px;
+            max-width: 250px;
         }
         .controls h3 {
             margin-bottom: 10px;
             color: #333;
-        }
-        .control-group {
-            margin-bottom: 10px;
-        }
-        .control-group label {
-            display: block;
-            margin-bottom: 4px;
-            font-size: 12px;
-            color: #666;
-        }
-        .control-group input {
-            width: 100%;
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
         }
         button {
             width: 100%;
@@ -127,59 +111,78 @@
 
     <div class="controls">
         <h3>Rain Radar</h3>
-        <div class="control-group">
-            <label>Latitude</label>
-            <input type="number" id="lat" value="48.85" step="0.01">
-        </div>
-        <div class="control-group">
-            <label>Longitude</label>
-            <input type="number" id="lng" value="2.35" step="0.01">
-        </div>
-        <div class="control-group">
-            <label>Radius (km)</label>
-            <input type="number" id="radius" value="50" min="5" max="100">
-        </div>
-        <button id="fetchBtn" onclick="fetchRadar()">Fetch Radar Data</button>
-        <button id="fetchAllBtn" onclick="fetchRadarAll()">Load All Contours</button>
-        <button onclick="useMapCenter()">Use Map Center</button>
+        <button id="fetchBtn" onclick="fetchRadar()">Load Visible Area</button>
         <div id="status" class="status" style="display: none;"></div>
         <div id="stats" class="stats">
             <div><strong>Timestamp:</strong> <span id="stat-timestamp">-</span></div>
             <div><strong>Contours:</strong> <span id="stat-contours">-</span></div>
             <div><strong>Points:</strong> <span id="stat-points">-</span></div>
+            <div><strong>Local Maxima:</strong> <span id="stat-maxima">-</span></div>
         </div>
     </div>
 
     <div class="legend">
-        <h4>Rain Intensity</h4>
+        <h4>Rain Rate (mm/h)</h4>
         <div class="legend-item">
-            <div class="legend-color" style="background: #00FF00;"></div>
-            <span>Light (&gt; 0.1 mm)</span>
+            <div class="legend-color" style="background: #0000FF;"></div>
+            <span>0.2</span>
         </div>
         <div class="legend-item">
-            <div class="legend-color" style="background: #FFFF00;"></div>
-            <span>Moderate (&gt; 1.0 mm)</span>
+            <div class="legend-color" style="background: #4000BF;"></div>
+            <span>0.4</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #800080;"></div>
+            <span>0.7</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #BF0040;"></div>
+            <span>1.0</span>
         </div>
         <div class="legend-item">
             <div class="legend-color" style="background: #FF0000;"></div>
-            <span>Heavy (&gt; 4.0 mm)</span>
+            <span>1.5</span>
+        </div>
+        <div class="legend-item" style="margin-top: 8px;">
+            <div style="width: 16px; height: 16px; background: #FF0000; border: 2px solid #000; border-radius: 50%; margin-right: 8px;"></div>
+            <span>Local Maximum</span>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@mapbox/polyline@1.2.1/src/polyline.js"></script>
     <script>
-        // Initialize map
-        const map = L.map('map').setView([48.85, 2.35], 10);
+        // Initialize map centered on France
+        const map = L.map('map').setView([46.5, 2.5], 6);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Feature group for radar polylines (featureGroup has getBounds())
+        // Feature group for radar polylines
         let radarLayer = L.featureGroup().addTo(map);
-        let centerMarker = null;
-        let radiusCircle = null;
+
+        // Feature group for local maxima markers
+        let maximaLayer = L.featureGroup().addTo(map);
+
+        // Fixed thresholds for color mapping (mm/h)
+        const THRESHOLDS = [0.2, 0.4, 0.7, 1.0, 1.5];
+
+        // Color scale based on rain rate (mm/h) - fixed thresholds
+        function getColor(value) {
+            // Find which threshold band this value falls into
+            // Blue (0.2) -> Magenta (0.7) -> Red (1.5)
+            const min = THRESHOLDS[0];
+            const max = THRESHOLDS[THRESHOLDS.length - 1];
+            const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+            // Blue -> Magenta -> Red gradient
+            const r = Math.round(t * 255);
+            const g = 0;
+            const b = Math.round((1 - t) * 255);
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
 
         function showStatus(message, type) {
             const status = document.getElementById('status');
@@ -197,30 +200,29 @@
                 document.getElementById('stat-timestamp').textContent = data.timestamp;
                 document.getElementById('stat-contours').textContent = data.contour_count;
                 document.getElementById('stat-points').textContent = data.total_points;
+                document.getElementById('stat-maxima').textContent = data.local_maxima ? data.local_maxima.length : 0;
             } else {
                 document.getElementById('stat-timestamp').textContent = '-';
                 document.getElementById('stat-contours').textContent = '-';
                 document.getElementById('stat-points').textContent = '-';
+                document.getElementById('stat-maxima').textContent = '-';
             }
         }
 
-        function useMapCenter() {
-            const center = map.getCenter();
-            document.getElementById('lat').value = center.lat.toFixed(4);
-            document.getElementById('lng').value = center.lng.toFixed(4);
-        }
-
         async function fetchRadar() {
-            const lat = parseFloat(document.getElementById('lat').value);
-            const lng = parseFloat(document.getElementById('lng').value);
-            const radius = parseInt(document.getElementById('radius').value);
+            const bounds = map.getBounds();
+            const minLat = bounds.getSouth();
+            const maxLat = bounds.getNorth();
+            const minLng = bounds.getWest();
+            const maxLng = bounds.getEast();
 
             const btn = document.getElementById('fetchBtn');
             btn.disabled = true;
             showStatus('Fetching radar data...', 'loading');
 
             try {
-                const response = await fetch(`/api/radar?lat=${lat}&lng=${lng}&radius=${radius}`);
+                const url = `/api/radar?min_lat=${minLat}&max_lat=${maxLat}&min_lng=${minLng}&max_lng=${maxLng}`;
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -230,65 +232,38 @@
 
                 // Clear previous data
                 radarLayer.clearLayers();
-                if (centerMarker) {
-                    map.removeLayer(centerMarker);
-                }
-                if (radiusCircle) {
-                    map.removeLayer(radiusCircle);
-                }
-
-                // Add center marker
-                centerMarker = L.circleMarker([lat, lng], {
-                    radius: 8,
-                    fillColor: '#4A90D9',
-                    color: '#fff',
-                    weight: 2,
-                    fillOpacity: 1
-                }).addTo(map);
-
-                // Add radius circle
-                radiusCircle = L.circle([lat, lng], {
-                    radius: radius * 1000,
-                    color: '#4A90D9',
-                    fillColor: '#4A90D9',
-                    fillOpacity: 0.05,
-                    weight: 1,
-                    dashArray: '5, 5'
-                }).addTo(map);
+                maximaLayer.clearLayers();
 
                 // Draw contours
-                let contoursByLevel = { light: 0, moderate: 0, heavy: 0 };
-
                 for (const contour of data.contours) {
-                    // Decode Google polyline
                     const decoded = polyline.decode(contour.polyline);
 
-                    // Create Leaflet polyline
                     const line = L.polyline(decoded, {
-                        color: '#0000FF',
+                        color: getColor(contour.rain_rate),
                         weight: 3,
-                        opacity: 0.5
+                        opacity: 1.0
                     });
 
                     radarLayer.addLayer(line);
-                    contoursByLevel[contour.level]++;
                 }
 
-                // Update UI
+                // Draw local maxima markers
+                if (data.local_maxima) {
+                    for (const max of data.local_maxima) {
+                        const marker = L.circleMarker([max.lat, max.lng], {
+                            radius: 8,
+                            fillColor: '#FF0000',
+                            color: '#000',
+                            weight: 2,
+                            fillOpacity: 0.8
+                        });
+                        marker.bindPopup(`<strong>Local Maximum</strong><br>Rain: ${max.rain_rate.toFixed(2)} mm/h`);
+                        maximaLayer.addLayer(marker);
+                    }
+                }
+
                 showStatus('Loaded ' + data.contour_count + ' contours', 'success');
                 updateStats(data);
-
-                // Fit map to data if there are contours
-                if (data.contour_count > 0) {
-                    const bounds = radarLayer.getBounds();
-                    if (bounds.isValid()) {
-                        map.fitBounds(bounds.pad(0.1));
-                    }
-                } else {
-                    map.setView([lat, lng], 10);
-                }
-
-                console.log('Contours by level:', contoursByLevel);
 
             } catch (error) {
                 console.error('Error fetching radar:', error);
@@ -299,81 +274,14 @@
             }
         }
 
-        async function fetchRadarAll() {
-            const btn = document.getElementById('fetchAllBtn');
-            btn.disabled = true;
-            showStatus('Fetching all radar contours...', 'loading');
-
-            try {
-                const response = await fetch('/api/radar/all');
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-
-                // Clear previous data
-                radarLayer.clearLayers();
-                if (centerMarker) {
-                    map.removeLayer(centerMarker);
-                    centerMarker = null;
-                }
-                if (radiusCircle) {
-                    map.removeLayer(radiusCircle);
-                    radiusCircle = null;
-                }
-
-                // Draw contours
-                let contoursByLevel = { light: 0, moderate: 0, heavy: 0 };
-
-                for (const contour of data.contours) {
-                    // Decode Google polyline
-                    const decoded = polyline.decode(contour.polyline);
-
-                    // Create Leaflet polyline
-                    const line = L.polyline(decoded, {
-                        color: '#0000FF',
-                        weight: 3,
-                        opacity: 0.5
-                    });
-
-                    radarLayer.addLayer(line);
-                    contoursByLevel[contour.level]++;
-                }
-
-                // Update UI
-                showStatus('Loaded ' + data.contour_count + ' contours (full coverage)', 'success');
-                document.getElementById('stat-timestamp').textContent = data.timestamp;
-                document.getElementById('stat-contours').textContent = data.contour_count;
-                document.getElementById('stat-points').textContent = data.total_points;
-
-                // Fit map to all data
-                if (data.contour_count > 0) {
-                    const bounds = radarLayer.getBounds();
-                    if (bounds.isValid()) {
-                        map.fitBounds(bounds.pad(0.05));
-                    }
-                }
-
-                console.log('Contours by level:', contoursByLevel);
-
-            } catch (error) {
-                console.error('Error fetching all radar:', error);
-                showStatus('Error: ' + error.message, 'error');
-                updateStats(null);
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        // Update inputs when map is clicked
-        map.on('click', function(e) {
-            document.getElementById('lat').value = e.latlng.lat.toFixed(4);
-            document.getElementById('lng').value = e.latlng.lng.toFixed(4);
+        // Auto-fetch on map move (debounced)
+        let fetchTimeout = null;
+        map.on('moveend', function() {
+            if (fetchTimeout) clearTimeout(fetchTimeout);
+            fetchTimeout = setTimeout(fetchRadar, 500);
         });
 
-        // Auto-fetch on load
+        // Initial fetch
         fetchRadar();
     </script>
 </body>

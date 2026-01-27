@@ -23,6 +23,9 @@ pub enum AppError {
     #[error("Radar data not yet available")]
     DataNotAvailable,
 
+    #[error("Invalid bounding box")]
+    InvalidBbox,
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -37,6 +40,10 @@ impl IntoResponse for AppError {
             AppError::DataNotAvailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "Radar data not yet available".to_string(),
+            ),
+            AppError::InvalidBbox => (
+                StatusCode::BAD_REQUEST,
+                "Invalid or out-of-bounds bounding box".to_string(),
             ),
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
         };

@@ -19,6 +19,10 @@ dependencyResolutionManagement {
                 password = providers.gradleProperty("gprkey").getOrElse(System.getenv("TOKEN"))
             }
         }
+        // Mapbox for polyline encoding
+        maven {
+            url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
+        }
     }
 }
 

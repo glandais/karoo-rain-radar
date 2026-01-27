@@ -1,6 +1,7 @@
 package io.github.glandais.karoo.rainradar.extension
 
 import android.util.Log
+import io.github.glandais.karoo.rainradar.services.KarooSystemServiceProvider
 import io.github.glandais.karoo.rainradar.services.RadarDrawService
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
@@ -11,7 +12,8 @@ class KarooRainRadarExtension : KarooExtension("karoo-rain-radar", "1.0.0") {
         const val TAG = "karoo-rain-radar"
     }
 
-    private val radarDrawService = RadarDrawService()
+    private lateinit var karooSystemProvider: KarooSystemServiceProvider
+    private lateinit var radarDrawService: RadarDrawService
 
     override fun startMap(emitter: Emitter<MapEffect>) {
         Log.d(TAG, "Starting rain radar map overlay")
@@ -27,6 +29,9 @@ class KarooRainRadarExtension : KarooExtension("karoo-rain-radar", "1.0.0") {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Rain Radar extension created")
+
+        karooSystemProvider = KarooSystemServiceProvider(applicationContext)
+        radarDrawService = RadarDrawService(karooSystemProvider)
     }
 
     override fun onDestroy() {
