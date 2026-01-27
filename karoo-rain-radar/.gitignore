@@ -1,0 +1,40 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+*.iml
+
+# IDE
+.idea/
+*.hprof
+
+# Local configuration
+local.properties
+
+# Android
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+
+# Test
+.cxx/
+
+# Secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Gradle wrapper (keep jar)
+!gradle/wrapper/gradle-wrapper.jar
