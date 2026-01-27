@@ -5,4 +5,12 @@
     id="karoo-rain-radar"
     scansDevices="false"
     mapLayer="true">
+
+    <DataType
+        typeId="radar-preview"
+        displayName="@string/radar_preview_name"
+        description="@string/radar_preview_description"
+        graphical="true"
+        icon="@drawable/ic_rain" />
+
 </ExtensionInfo>

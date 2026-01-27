@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rain Radar</title>
+    <script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100%; }
+        #back-btn {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 1000;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        #status {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <button id="back-btn" onclick="goBack()">&times;</button>
+    <div id="status">Loading...</div>
+
+    <script>
+        // Parse URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const lat = parseFloat(params.get('lat')) || 48.85;
+        const lng = parseFloat(params.get('lng')) || 2.35;
+        const zoom = parseFloat(params.get('zoom')) || 10;
+
+        // Get backend URL (same origin)
+        const backendUrl = window.location.origin;
+
+        // Initialize map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://demotiles.maplibre.org/style.json',
+            center: [lng, lat],
+            zoom: zoom,
+            attributionControl: false
+        });
+
+        // Add navigation controls
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        // Radar overlay source and layer IDs
+        const RADAR_SOURCE = 'radar-source';
+        const RADAR_LAYER = 'radar-layer';
+
+        // Debounce timer
+        let updateTimer = null;
+
+        // Update radar overlay
+        function updateRadarOverlay() {
+            const bounds = map.getBounds();
+            const radarUrl = `${backendUrl}/api/radar/tile` +
+                `?min_lat=${bounds.getSouth()}` +
+                `&max_lat=${bounds.getNorth()}` +
+                `&min_lng=${bounds.getWest()}` +
+                `&max_lng=${bounds.getEast()}` +
+                `&width=512&height=512&t=${Date.now()}`;
+
+            console.log('Loading radar:', radarUrl);
+            document.getElementById('status').textContent = 'Loading radar...';
+
+            const source = map.getSource(RADAR_SOURCE);
+            if (source) {
+                // Update existing source
+                source.updateImage({
+                    url: radarUrl,
+                    coordinates: [
+                        [bounds.getWest(), bounds.getNorth()], // top-left
+                        [bounds.getEast(), bounds.getNorth()], // top-right
+                        [bounds.getEast(), bounds.getSouth()], // bottom-right
+                        [bounds.getWest(), bounds.getSouth()]  // bottom-left
+                    ]
+                });
+            } else {
+                // Add new source and layer
+                map.addSource(RADAR_SOURCE, {
+                    type: 'image',
+                    url: radarUrl,
+                    coordinates: [
+                        [bounds.getWest(), bounds.getNorth()],
+                        [bounds.getEast(), bounds.getNorth()],
+                        [bounds.getEast(), bounds.getSouth()],
+                        [bounds.getWest(), bounds.getSouth()]
+                    ]
+                });
+
+                map.addLayer({
+                    id: RADAR_LAYER,
+                    type: 'raster',
+                    source: RADAR_SOURCE,
+                    paint: {
+                        'raster-opacity': 0.8
+                    }
+                });
+            }
+
+            document.getElementById('status').textContent = 'Radar loaded';
+            setTimeout(() => {
+                document.getElementById('status').textContent = '';
+            }, 2000);
+        }
+
+        // Schedule radar update with debounce
+        function scheduleRadarUpdate() {
+            if (updateTimer) {
+                clearTimeout(updateTimer);
+            }
+            updateTimer = setTimeout(updateRadarOverlay, 500);
+        }
+
+        // Map events
+        map.on('load', () => {
+            console.log('Map loaded');
+            updateRadarOverlay();
+        });
+
+        map.on('moveend', scheduleRadarUpdate);
+
+        // Auto-refresh every 5 minutes
+        setInterval(updateRadarOverlay, 5 * 60 * 1000);
+
+        // Back button handler - try to close or go back
+        function goBack() {
+            if (window.Android && window.Android.close) {
+                window.Android.close();
+            } else if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.close();
+            }
+        }
+
+        // Expose center update for Android interface
+        function setCenter(newLat, newLng) {
+            map.setCenter([newLng, newLat]);
+        }
+    </script>
+</body>
+</html>
