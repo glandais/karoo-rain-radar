@@ -9,6 +9,7 @@ import os
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Optional
 
@@ -77,7 +78,10 @@ class RadarCache:
 # Global cache for radar data
 _radar_cache: Optional[RadarCache] = None
 _cache_lock = asyncio.Lock()
-CACHE_TTL = 300  # 5 minutes
+_download_task: Optional[asyncio.Task] = None
+
+# Meteo-France updates every 5 minutes, we add 10 seconds margin
+DOWNLOAD_DELAY_SECONDS = 5 * 60 + 10
 
 
 def get_api_key() -> str:
@@ -95,6 +99,28 @@ def get_api_key() -> str:
     if not key:
         raise RuntimeError("METEO_FRANCE_API_KEY not set")
     return key
+
+
+async def fetch_latest_timestamp() -> str:
+    """Fetch the latest available radar timestamp from Meteo-France API."""
+    api_key = get_api_key()
+    url = f"{METEO_API_BASE}/mosaiques/{ZONE}/observations/{OBSERVATION}"
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(url, headers={"apikey": api_key})
+        response.raise_for_status()
+        data = response.json()
+
+        # Find the link for our maille (500m)
+        for link in data.get("links", []):
+            if f"maille={MAILLE}" in link.get("href", ""):
+                validity_time = link.get("validity_time")
+                if validity_time:
+                    # Convert "2026-01-27T17:40:00Z" to "20260127T174000Z"
+                    dt = datetime.fromisoformat(validity_time.replace("Z", "+00:00"))
+                    return dt.strftime("%Y%m%dT%H%M%SZ")
+
+        raise RuntimeError("No radar data available for maille " + str(MAILLE))
 
 
 async def fetch_radar_data() -> bytes:
@@ -321,26 +347,92 @@ def simplify_contour(coords: list[tuple[float, float]], tolerance: float = 0.000
     return [tuple(p) for p in simplified]
 
 
-async def get_cached_radar() -> RadarCache:
-    """Get radar data from cache or fetch new."""
+def parse_radar_timestamp(date_str: str) -> datetime:
+    """Parse radar timestamp from format 'YYYYMMDDTHHMMSSZ' to datetime."""
+    # Format: "20260127T143500Z"
+    return datetime.strptime(date_str, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+
+
+def calculate_next_poll_time(date_str: str) -> float:
+    """Calculate timestamp when we should start polling for new data."""
+    radar_time = parse_radar_timestamp(date_str)
+    # New data expected at radar_time + 7 minutes
+    return radar_time.timestamp() + 7 * 60
+
+
+async def check_and_download():
+    """Check if new data is available and download it."""
     global _radar_cache
 
-    async with _cache_lock:
-        now = time.time()
+    log_prefix = f"[{datetime.now(timezone.utc).isoformat()}]"
+    now = time.time()
 
-        if _radar_cache is None or (now - _radar_cache.timestamp) > CACHE_TTL:
-            print("Fetching new radar data...")
-            try:
+    # If we have cached data, check if it's time to poll
+    if _radar_cache is not None:
+        next_poll_time = calculate_next_poll_time(_radar_cache.date_str)
+        if now < next_poll_time:
+            # Not yet time to poll
+            return
+
+    try:
+        # Check latest available timestamp
+        latest_timestamp = await fetch_latest_timestamp()
+
+        current_timestamp = _radar_cache.date_str if _radar_cache else None
+
+        if current_timestamp is None or latest_timestamp != current_timestamp:
+            # New data available, download it
+            print(f"{log_prefix} New data available: {latest_timestamp}")
+
+            async with _cache_lock:
                 data = await fetch_radar_data()
                 _radar_cache = parse_hdf5(data)
-                print(f"Radar data updated: {_radar_cache.date_str}")
-            except Exception as e:
-                if _radar_cache is not None:
-                    print(f"Failed to fetch new data, using stale cache: {e}")
-                else:
-                    raise
+                print(f"{log_prefix} Radar data downloaded: {_radar_cache.date_str}")
 
-        return _radar_cache
+                next_poll = calculate_next_poll_time(_radar_cache.date_str)
+                wait_seconds = next_poll - time.time()
+                print(f"{log_prefix} Next poll in {wait_seconds:.0f} seconds")
+        else:
+            print(f"{log_prefix} Waiting for new data (current: {current_timestamp})...")
+
+    except Exception as e:
+        print(f"{log_prefix} Error: {e}")
+
+
+async def ticker_loop():
+    """Run check_and_download every 10 seconds."""
+    while True:
+        try:
+            await check_and_download()
+        except Exception as e:
+            print(f"[{datetime.now(timezone.utc).isoformat()}] Ticker error: {e}")
+        await asyncio.sleep(10)
+
+
+async def get_cached_radar() -> RadarCache:
+    """Get radar data from cache."""
+    if _radar_cache is None:
+        raise HTTPException(status_code=503, detail="Radar data not yet available")
+    return _radar_cache
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the ticker loop on startup."""
+    global _download_task
+    _download_task = asyncio.create_task(ticker_loop())
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cancel ticker loop on shutdown."""
+    global _download_task
+    if _download_task:
+        _download_task.cancel()
+        try:
+            await _download_task
+        except asyncio.CancelledError:
+            pass
 
 
 @app.get("/api/radar")
@@ -357,10 +449,7 @@ async def get_radar(
     - moderate: > 1.0 mm/h
     - heavy: > 4.0 mm/h
     """
-    try:
-        cache = await get_cached_radar()
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to fetch radar data: {e}")
+    cache = await get_cached_radar()
 
     # Create circular area around the center point
     area = create_circle(lat, lng, radius)
