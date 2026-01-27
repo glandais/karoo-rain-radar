@@ -1,0 +1,55 @@
+[package]
+name = "rain-radar"
+version = "1.0.0"
+edition = "2021"
+authors = ["Rain Radar Team"]
+description = "Rain radar backend for GPS bike computer"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tokio = { version = "1.43", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# HDF5 parsing
+hdf5 = "0.8"
+ndarray = "0.15"
+
+# Contour extraction
+contour = "0.1"
+geojson = "0.13"
+
+# Geometry and projections
+geo = "0.29"
+proj = "0.28"
+
+# Polyline encoding
+polyline = "0.11"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Configuration
+dotenvy = "0.15"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+tempfile = "3.15"
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
