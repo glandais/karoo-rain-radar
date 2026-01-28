@@ -2,6 +2,8 @@ package io.github.glandais.karoo.rainradar.extension
 
 import android.util.Log
 import io.github.glandais.karoo.rainradar.datatype.RadarPreviewType
+import io.github.glandais.karoo.rainradar.datatype.RainForecastType
+import io.github.glandais.karoo.rainradar.datatype.RainTimingType
 import io.github.glandais.karoo.rainradar.services.KarooSystemServiceProvider
 import io.github.glandais.karoo.rainradar.services.RadarDrawService
 import io.hammerhead.karooext.extension.KarooExtension
@@ -18,7 +20,9 @@ class KarooRainRadarExtension : KarooExtension("karoo-rain-radar", "1.0.0") {
 
     override val types by lazy {
         listOf(
-            RadarPreviewType(extension)
+            RadarPreviewType(extension),
+            RainForecastType(extension),
+            RainTimingType(extension)
         )
     }
 
