@@ -115,7 +115,7 @@ pub fn encode_png(img: &RgbaImage) -> Vec<u8> {
             img.as_raw(),
             img.width(),
             img.height(),
-            image::ExtendedColorType::Rgba8,
+            image::ColorType::Rgba8,
         )
         .expect("Failed to encode PNG");
 
