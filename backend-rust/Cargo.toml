@@ -25,7 +25,7 @@ geojson = "0.13"
 
 # Geometry and projections
 geo = "0.32"
-proj = "0.28"
+proj = "0.31"
 
 # Polyline encoding
 polyline = "0.11"
