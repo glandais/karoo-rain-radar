@@ -10,7 +10,7 @@ description = "Rain radar backend for GPS bike computer"
 axum = { version = "0.8", features = ["macros"] }
 tokio = { version = "1.43", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.7", features = ["fs", "cors", "trace"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json"] }
