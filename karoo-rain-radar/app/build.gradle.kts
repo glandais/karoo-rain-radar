@@ -68,7 +68,7 @@ dependencies {
     implementation(libs.lifecycle.runtime)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.activity.compose)
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
 
     // Glide for image loading in data field
     implementation("com.github.bumptech.glide:glide:4.16.0")
