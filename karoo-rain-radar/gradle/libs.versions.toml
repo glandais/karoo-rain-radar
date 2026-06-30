@@ -1,14 +1,14 @@
 [versions]
-agp = "8.5.2"
-kotlin = "2.0.20"
-karoo-ext = "1.1.8"
-ktor = "3.0.3"
+agp = "9.2.1"
+kotlin = "2.4.0"
+karoo-ext = "1.1.9"
+ktor = "3.5.1"
 ktor-client-karoo = "1.0.1"
-compose-bom = "2024.09.02"
-core-ktx = "1.13.1"
-lifecycle = "2.8.5"
-activity-compose = "1.9.2"
-kotlinx-serialization = "1.7.1"
+compose-bom = "2026.06.00"
+core-ktx = "1.19.0"
+lifecycle = "2.11.0"
+activity-compose = "1.13.0"
+kotlinx-serialization = "1.11.0"
 
 [libraries]
 karoo-ext = { module = "io.hammerhead:karoo-ext", version.ref = "karoo-ext" }
@@ -30,6 +30,5 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
