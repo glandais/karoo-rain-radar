@@ -122,8 +122,12 @@ pub fn find_contours(data: &Array2<f64>, threshold: f64) -> Vec<Vec<(f64, f64)>>
     for feature in features {
         // Get the geometry from the feature
         if let Some(geometry) = feature.geometry {
-            // The geometry value contains the coordinates
-            if let geojson::Value::MultiPolygon(multi_polygon) = geometry.value {
+            // The geometry value contains the coordinates.
+            // Note: this matches against `geojson-legacy` (geojson 0.13), not
+            // our direct `geojson` 1.0 dependency, because the `contour` crate
+            // (v0.1) is internally pinned to geojson ^0.13 and returns that
+            // version's `Feature`/`Geometry`/`Value` types from `contours()`.
+            if let geojson_legacy::Value::MultiPolygon(multi_polygon) = geometry.value {
                 for polygon in multi_polygon {
                     // Each polygon has rings: first is exterior, rest are holes
                     for ring in polygon {

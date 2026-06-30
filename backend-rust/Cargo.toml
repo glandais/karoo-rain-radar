@@ -10,7 +10,7 @@ description = "Rain radar backend for GPS bike computer"
 axum = { version = "0.8", features = ["macros"] }
 tokio = { version = "1.43", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.7", features = ["fs", "cors", "trace"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json"] }
@@ -21,11 +21,16 @@ ndarray = "0.15"
 
 # Contour extraction
 contour = "0.1"
-geojson = "0.13"
+geojson = "1.0"
+# `contour` 0.1 is pinned to geojson ^0.13 internally; its `contours()` output
+# (Feature/Geometry/Value) is therefore typed against that older geojson, not
+# the 1.0 line above. Keep an explicit renamed dependency on 0.13 so we can
+# name that type when destructuring contour's output.
+geojson-legacy = { package = "geojson", version = "0.13" }
 
 # Geometry and projections
-geo = "0.32"
-proj = "0.28"
+geo = "0.33"
+proj = "0.31"
 
 # Polyline encoding
 polyline = "0.11"
