@@ -21,7 +21,7 @@ ndarray = "0.15"
 
 # Contour extraction
 contour = "0.1"
-geojson = "0.13"
+geojson = "1.0"
 
 # Geometry and projections
 geo = "0.32"
