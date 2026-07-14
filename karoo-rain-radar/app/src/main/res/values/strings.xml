@@ -4,4 +4,8 @@
     <string name="extension_name">Rain Radar</string>
     <string name="radar_preview_name">Radar Preview</string>
     <string name="radar_preview_description">Mini radar preview - tap to open full map</string>
+    <string name="rain_forecast_name">Rain Forecast</string>
+    <string name="rain_forecast_description">Circular rain visualization showing precipitation around you</string>
+    <string name="rain_timing_name">Rain Timing</string>
+    <string name="rain_timing_description">Time until rain arrives or ends</string>
 </resources>

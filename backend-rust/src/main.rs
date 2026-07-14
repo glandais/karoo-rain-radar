@@ -168,6 +168,7 @@ async fn main() {
     let app = Router::new()
         .route("/api/radar", get(routes::get_radar))
         .route("/api/radar/tile", get(routes::get_tile))
+        .route("/api/rain/forecast", get(routes::get_forecast))
         .route("/api/health", get(routes::health))
         .nest_service("/static", ServeDir::new(&static_dir))
         .fallback_service(ServeDir::new(&static_dir).append_index_html_on_directories(true))

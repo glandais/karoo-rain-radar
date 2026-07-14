@@ -13,4 +13,18 @@
         graphical="true"
         icon="@drawable/ic_rain" />
 
+    <DataType
+        typeId="rain-forecast"
+        displayName="@string/rain_forecast_name"
+        description="@string/rain_forecast_description"
+        graphical="true"
+        icon="@drawable/ic_rain" />
+
+    <DataType
+        typeId="rain-timing"
+        displayName="@string/rain_timing_name"
+        description="@string/rain_timing_description"
+        graphical="true"
+        icon="@drawable/ic_rain" />
+
 </ExtensionInfo>
