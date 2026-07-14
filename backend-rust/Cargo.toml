@@ -20,7 +20,7 @@ hdf5 = "0.8"
 ndarray = "0.15"
 
 # Contour extraction
-contour = "0.1"
+contour = "0.13"
 geojson = "1.0"
 # `contour` 0.1 is pinned to geojson ^0.13 internally; its `contours()` output
 # (Feature/Geometry/Value) is therefore typed against that older geojson, not
