@@ -17,7 +17,7 @@ reqwest = { version = "0.12", features = ["json"] }
 
 # HDF5 parsing
 hdf5 = "0.8"
-ndarray = "0.15"
+ndarray = "0.17"
 
 # Contour extraction
 contour = "0.1"
