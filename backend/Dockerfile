@@ -1,42 +1,57 @@
-# Stage 1: Build dependencies
-FROM python:3.14-slim AS builder
+# Stage 1: Build
+FROM rust:1.97-bookworm AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies for HDF5 and PROJ
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libhdf5-dev \
     pkg-config \
+    libhdf5-dev \
+    libproj-dev \
+    clang \
+    cmake \
+    sqlite3 \
+    libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies to a virtual env
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy manifests first for better caching
+COPY Cargo.toml Cargo.lock* ./
+
+# Create dummy src to build dependencies
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs
+
+# Build dependencies only
+RUN cargo build --release && rm -rf src
+
+# Copy actual source code
+COPY src ./src
+COPY static ./static
+
+# Build the application
+RUN touch src/main.rs && cargo build --release
 
 # Stage 2: Runtime
-FROM python:3.14-slim AS runtime
+FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies only (libhdf5 for h5py)
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libhdf5-serial-dev \
+    libhdf5-103-1 \
+    libproj25 \
+    libsqlite3-0 \
+    ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy virtual env from builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Copy binary from builder
+COPY --from=builder /app/target/release/rain-radar /app/rain-radar
 
-# Copy application code
-COPY radar_server.py .
-
-# Copy static files (optional - create dir if not exists)
-RUN mkdir -p /app/static
-COPY static/ ./static/
+# Copy static files
+COPY --from=builder /app/static /app/static
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
@@ -47,7 +62,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8080/api/health', timeout=5).raise_for_status()"
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
-# Run with uvicorn
-CMD ["uvicorn", "radar_server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the application
+CMD ["/app/rain-radar"]

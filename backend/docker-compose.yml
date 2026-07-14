@@ -1,18 +1,18 @@
+version: '3.8'
+
 services:
-  radar-server:
+  rain-radar:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rain-radar-backend
     ports:
-      - "${HTTP_PORT:-8090}:8080"
+      - "8080:8080"
     environment:
       - METEO_FRANCE_API_KEY=${METEO_FRANCE_API_KEY}
-    env_file:
-      - .env
+      - RUST_LOG=info
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/api/health', timeout=5).raise_for_status()"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

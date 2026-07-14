@@ -5,22 +5,25 @@ Rain radar overlay for Karoo GPS bike computers, using Meteo-France radar data.
 ## Architecture
 
 ```
-[Meteo-France API] --> [Python Backend] --> [Karoo Extension]
-      |                       |                     |
-   HDF5 (2MB)          JSON (<100KB)         Polyline overlay
-                              |
-                     - Contour extraction
-                     - Spatial filtering
-                     - Google polyline encoding
+[Meteo-France API] --> [Rust Backend] --> [Karoo Extension]
+      |                      |                    |
+   HDF5 (2MB)         PNG tile / polylines   Rain overlay
+                             |
+                    - Contour extraction
+                    - Spatial filtering (bbox)
+                    - PNG tile rasterization
+                    - Google polyline encoding
 ```
 
-The Karoo SDK only supports vector overlays (polylines), not raster tiles. This project extracts rain intensity contours from radar data and renders them as colored polylines on the map.
+This project extracts rain intensity from Meteo-France radar data and serves it to
+the Karoo extension either as a PNG overlay tile or as encoded contour polylines.
 
 ## Components
 
 ### Backend (`backend/`)
 
-FastAPI server that processes Meteo-France radar data.
+Rust (Axum) server that processes Meteo-France radar data. See
+[`backend/README.md`](backend/README.md) for full build and run instructions.
 
 ### Web Frontend (`backend/static/`)
 
@@ -28,32 +31,30 @@ Simple Leaflet-based web interface for testing and visualizing radar data.
 
 ### Karoo Extension (`karoo-rain-radar/`)
 
-Android extension that fetches and displays rain contours on the Karoo map.
+Android extension that fetches and displays the rain overlay on the Karoo map.
 
 ## Setup
 
 ### 1. Backend
 
-```bash
-cd backend
-pip install -r requirements.txt
-```
+See [`backend/README.md`](backend/README.md) for prerequisites (HDF5 + PROJ)
+and details. Quick start:
 
-Create a `.env` file in the project root with your Meteo-France API key:
+Create a `.env` file with your Meteo-France API key:
 ```
 METEO_FRANCE_API_KEY=your_api_key_here
+RUST_LOG=info
 ```
 
 Run the server:
 ```bash
-python radar_server.py
-# Or with uvicorn for production:
-uvicorn radar_server:app --host 0.0.0.0 --port 8080
+cd backend
+cargo run --release
 ```
 
 Verify it works:
 ```bash
-curl "http://localhost:8080/api/radar?lat=48.85&lng=2.35&radius=30"
+curl "http://localhost:8080/api/radar?min_lat=48.5&max_lat=49.2&min_lng=2.0&max_lng=2.7"
 ```
 
 Open http://localhost:8080 in a browser to use the web frontend.
@@ -75,9 +76,10 @@ gpr.key=YOUR_GITHUB_TOKEN
 
 Get a token from https://github.com/settings/tokens with `read:packages` scope.
 
-2. Edit `RadarDrawService.kt` line 36 to set your backend URL:
+2. Set your backend URL in the extension sources (`RadarPreviewType.kt` /
+   `RadarDrawService.kt`):
 ```kotlin
-private val backendUrl = "http://YOUR_SERVER_IP:8080/api/radar"
+private const val BACKEND_URL = "http://YOUR_SERVER_IP:8080"
 ```
 
 #### Build
@@ -97,35 +99,46 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ## API Reference
 
+All spatial queries use a bounding box (`min_lat`, `max_lat`, `min_lng`, `max_lng`).
+
 ### GET /api/radar
 
-Returns rain contours as encoded polylines.
+Returns rain contours as encoded polylines, clipped to the bounding box.
 
 **Parameters:**
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| lat | float | Yes | Latitude of center point |
-| lng | float | Yes | Longitude of center point |
-| radius | float | No | Radius in km (default: 30, range: 5-100) |
+| min_lat | float | Yes | South edge of the bounding box |
+| max_lat | float | Yes | North edge of the bounding box |
+| min_lng | float | Yes | West edge of the bounding box |
+| max_lng | float | Yes | East edge of the bounding box |
 
 **Response:**
 ```json
 {
   "timestamp": "20260127T080000Z",
-  "center": {"lat": 48.85, "lng": 2.35},
-  "radius_km": 30,
+  "bbox": {"min_lat": 48.5, "max_lat": 49.2, "min_lng": 2.0, "max_lng": 2.7},
   "contours": [
     {
-      "level": "light",
-      "color": "#4000FF00",
+      "rain_rate": 0.2,
       "polyline": "encoded_polyline_string",
       "points": 42
     }
+  ],
+  "local_maxima": [
+    {"lat": 48.85, "lng": 2.35, "rain_rate": 1.4}
   ],
   "total_points": 1234,
   "contour_count": 43
 }
 ```
+
+### GET /api/radar/tile
+
+Returns the rain overlay as a transparent PNG image for the bounding box.
+
+**Parameters:** `min_lat`, `max_lat`, `min_lng`, `max_lng` (required), plus optional
+`width` / `height` (default 256, max 2048).
 
 ### GET /api/health
 
@@ -135,28 +148,13 @@ Health check endpoint. Returns `{"status": "ok"}`.
 
 ### Rain Intensity Thresholds
 
-The backend extracts contours at three intensity levels (in `radar_server.py`):
-
-| Level | Threshold | Description |
-|-------|-----------|-------------|
-| light | 0.1 mm | Light rain/drizzle |
-| moderate | 1.0 mm | Moderate rain |
-| heavy | 4.0 mm | Heavy rain |
-
-### Colors
-
-Contour colors (ARGB format):
-
-| Level | Color | Visual |
-|-------|-------|--------|
-| light | `#4000FF00` | Transparent green |
-| moderate | `#60FFFF00` | Semi-transparent yellow |
-| heavy | `#80FF0000` | Semi-transparent red |
+The backend extracts contours at five ACRR thresholds (in `backend/src/routes/radar.rs`),
+in 0.01 mm units — `20, 40, 70, 100, 150` — corresponding to 0.2 / 0.4 / 0.7 / 1.0 / 1.5 mm/h.
 
 ### Refresh Interval
 
-- Backend cache: 5 minutes (`CACHE_TTL`)
-- Extension refresh: 5 minutes (`refreshIntervalMs`)
+- Backend polling: every ~10 s, new data expected ~7 min after each radar timestamp
+- Extension refresh: driven by location/zoom updates
 
 ## Meteo-France API
 
