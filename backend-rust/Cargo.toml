@@ -13,20 +13,16 @@ tower = "0.5"
 tower-http = { version = "0.7", features = ["fs", "cors", "trace"] }
 
 # HTTP client
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json", "query"] }
 
-# HDF5 parsing
-hdf5 = "0.8"
-ndarray = "0.15"
+# HDF5 parsing (hdf5-metno is the maintained fork; supports HDF5 1.14+)
+hdf5 = { package = "hdf5-metno", version = "0.13" }
+ndarray = "0.17"
 
 # Contour extraction
-contour = "0.1"
-geojson = "1.0"
-# `contour` 0.1 is pinned to geojson ^0.13 internally; its `contours()` output
-# (Feature/Geometry/Value) is therefore typed against that older geojson, not
-# the 1.0 line above. Keep an explicit renamed dependency on 0.13 so we can
-# name that type when destructuring contour's output.
-geojson-legacy = { package = "geojson", version = "0.13" }
+# `contour` 0.13 returns geo-types `MultiPolygon<f64>` directly (geo-types ^0.7,
+# same as `geo` below), so no geojson bridge is needed.
+contour = "0.13"
 
 # Geometry and projections
 geo = "0.33"
@@ -36,7 +32,7 @@ proj = "0.31"
 polyline = "0.11"
 
 # Image generation
-image = "0.24"
+image = "0.25"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

@@ -113,37 +113,29 @@ pub fn find_contours(data: &Array2<f64>, threshold: f64) -> Vec<Vec<(f64, f64)>>
         }
     }
 
-    // Build contours using the contour crate
-    let contour_builder = ContourBuilder::new(cols as u32, rows as u32, false);
-    let features = contour_builder.contours(&data_clean, &[threshold]);
+    // Build contours using the contour crate.
+    // `contour` 0.13 returns geo-types `MultiPolygon<f64>` (via `Contour::geometry()`),
+    // with pixel coordinates as Coord { x: col, y: row }.
+    let contour_builder = ContourBuilder::new(cols, rows, false);
+    let contours = contour_builder
+        .contours(&data_clean, &[threshold])
+        .unwrap_or_default();
 
     let mut result = Vec::new();
 
-    for feature in features {
-        // Get the geometry from the feature
-        if let Some(geometry) = feature.geometry {
-            // The geometry value contains the coordinates.
-            // Note: this matches against `geojson-legacy` (geojson 0.13), not
-            // our direct `geojson` 1.0 dependency, because the `contour` crate
-            // (v0.1) is internally pinned to geojson ^0.13 and returns that
-            // version's `Feature`/`Geometry`/`Value` types from `contours()`.
-            if let geojson_legacy::Value::MultiPolygon(multi_polygon) = geometry.value {
-                for polygon in multi_polygon {
-                    // Each polygon has rings: first is exterior, rest are holes
-                    for ring in polygon {
-                        let coords: Vec<(f64, f64)> = ring
-                            .iter()
-                            .map(|coord| {
-                                // GeoJSON coords are [x, y] = [col, row]
-                                // We need (row, col) for our pixel_to_latlon
-                                (coord[1], coord[0])
-                            })
-                            .collect();
+    for contour in contours {
+        for polygon in contour.geometry() {
+            // Each polygon has an exterior ring plus interior rings (holes)
+            let rings = std::iter::once(polygon.exterior()).chain(polygon.interiors());
+            for ring in rings {
+                let coords: Vec<(f64, f64)> = ring
+                    .coords()
+                    // Coord is (x, y) = (col, row); we need (row, col) downstream
+                    .map(|coord| (coord.y, coord.x))
+                    .collect();
 
-                        if coords.len() >= 3 {
-                            result.push(coords);
-                        }
-                    }
+                if coords.len() >= 3 {
+                    result.push(coords);
                 }
             }
         }
