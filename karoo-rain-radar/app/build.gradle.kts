@@ -66,6 +66,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.1")
 
     // Glide for image loading in data field
-    implementation("com.github.bumptech.glide:glide:5.0.7")
+    implementation("com.github.bumptech.glide:glide:5.0.9")
 
 }
