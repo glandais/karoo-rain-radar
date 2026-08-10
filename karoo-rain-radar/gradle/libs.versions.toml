@@ -2,7 +2,7 @@
 agp = "9.3.1"
 kotlin = "2.4.10"
 karoo-ext = "1.1.9"
-ktor = "3.5.1"
+ktor = "3.5.2"
 ktor-client-karoo = "1.0.1"
 compose-bom = "2026.06.01"
 core-ktx = "1.19.0"
