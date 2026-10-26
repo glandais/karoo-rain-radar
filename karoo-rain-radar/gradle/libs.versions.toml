@@ -8,7 +8,7 @@ compose-bom = "2026.09.00"
 core-ktx = "1.19.1"
 lifecycle = "2.11.0"
 activity-compose = "1.13.0"
-kotlinx-serialization = "1.11.0"
+kotlinx-serialization = "1.12.0"
 
 [libraries]
 karoo-ext = { module = "io.hammerhead:karoo-ext", version.ref = "karoo-ext" }
