@@ -26,7 +26,7 @@ contour = "0.13"
 
 # Geometry and projections
 geo = "0.33"
-proj = "0.31"
+proj = "0.32"
 
 # Polyline encoding
 polyline = "0.11"
