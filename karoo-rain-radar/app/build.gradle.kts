@@ -6,7 +6,11 @@ plugins {
 
 android {
     namespace = "io.github.glandais.karoo.rainradar"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "io.github.glandais.karoo.rainradar"
@@ -66,6 +70,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.8.0")
 
     // Glide for image loading in data field
-    implementation("com.github.bumptech.glide:glide:5.0.9")
+    implementation("com.github.bumptech.glide:glide:5.0.10")
 
 }
